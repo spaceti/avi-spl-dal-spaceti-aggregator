@@ -1,10 +1,7 @@
 package com.avispl.symphony.dal.communicator.aggregator;
 
-/**
- * Hello world!
- *
- */
-public class App 
+
+public class SpacetiAggregatorCommunicator 
 {
     public static void main( String[] args )
     {
