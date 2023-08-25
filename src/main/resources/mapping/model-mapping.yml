@@ -1,0 +1,15 @@
+models:
+  - model:
+      name: Generic
+      vendor: Spaceti
+      node: records
+      filter: get("sn") != null # filter is necessary to get records back
+      mapping:
+        type: Computer
+        category: Spaceti
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: at("/location/device_name")
+        deviceMake: "Other"
+        deviceModel: "Unknown"
+        deviceOnline: "Unknown"

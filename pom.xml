@@ -50,12 +50,6 @@
         <scope>system</scope>
         <systemPath>${basedir}/lib/icmp4j-1018.jar</systemPath>
     </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.11</version>
-      <scope>test</scope>
-    </dependency>
 
     <!--dependencies of symphony-dal-commons-->
     <dependency>
@@ -161,6 +155,16 @@
         <version>5.1.9.RELEASE</version>
         <scope>test</scope>
     </dependency>
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>2.20.0</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.20.0</version>
+    </dependency>
   </dependencies>
 
   <build>
@@ -186,7 +190,20 @@
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.22.1</version>
+          <version>2.19.1</version> <!-- Specific due to memory leak in 2.20 -->
+          <dependencies>
+            <!--Custom provider and engine for Junit 5 to surefire-->
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-surefire-provider</artifactId>
+                <version>1.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-engine</artifactId>
+                <version>5.6.0-M1</version>
+            </dependency>
+        </dependencies>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
