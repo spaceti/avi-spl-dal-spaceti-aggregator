@@ -7,6 +7,7 @@ import com.avispl.symphony.dal.aggregator.parser.AggregatedDeviceProcessor;
 import com.avispl.symphony.dal.aggregator.parser.PropertiesMapping;
 import com.avispl.symphony.dal.aggregator.parser.PropertiesMappingParser;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.avispl.symphony.dal.util.StringUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 import java.util.stream.Collectors;
@@ -268,18 +269,15 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
      * */
     private void processPaginatedSpacetiRetrieval(List<AggregatedDevice> spacetiDevices) throws Exception {
         boolean hasNextPage = true;
-        String nextPageToken = null;
+        String nextPageURL = SPACETI_DEVICES_URL;
         Pair<JsonNode, String> response;
         while(hasNextPage) {
-            // if (logger.isDebugEnabled()) {
-            //     logger.debug(String.format("Receiving page with next_page_token: %s", nextPageToken));
-            // }
-            // response = retrieveZoomRooms(locationId, nextPageToken);
-            // nextPageToken = response.getRight();
-            // hasNextPage = StringUtils.isNotNullOrEmpty(nextPageToken);
-            // zoomRooms.addAll(aggregatedDeviceProcessor.extractDevices(response.getLeft()));
-            response = retrieveSpacetiDevices(nextPageToken);
-            hasNextPage = false;
+            if (logger.isDebugEnabled()) {
+                logger.debug(String.format("Receiving page with URL: %s", nextPageURL));
+            }
+            response = retrieveSpacetiDevices(nextPageURL);
+            nextPageURL = response.getRight();
+            hasNextPage = StringUtils.isNotNullOrEmpty(nextPageURL);
             spacetiDevices.addAll(aggregatedDeviceProcessor.extractDevices(response.getLeft()));
         }
     }
@@ -287,27 +285,23 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
     /**
      * Retrieve list of Spaceti devices available
      *
-     * @param nextPageToken token to reference the next page. Null or empty if shouldn't be applied
-     * @return response pair of JsonNode and next_page_token
+     * @param nextPageURL token to reference the next URL to retrieve
+     * @return response pair of JsonNode and next_url
      * @throws Exception if a communication error occurs
      */
-    private Pair<JsonNode, String> retrieveSpacetiDevices(String nextPageToken) throws Exception {
-        /*StringBuilder queryString = new StringBuilder();
-        if (!StringUtils.isNullOrEmpty(zoomRoomTypes)) {
-            queryString.append("&type=").append(zoomRoomTypes);
-        }
-        if (!StringUtils.isNullOrEmpty(locationId)) {
-            queryString.append("&location_id=").append(locationId);
-        }
-        if (!StringUtils.isNullOrEmpty(nextPageToken)) {
-            queryString.append("&next_page_token=").append(nextPageToken);
-        }*/
-        //JsonNode response = doGetWithRetry(String.format(ZOOM_ROOMS_URL, roomRequestPageSize) + queryString);
-        JsonNode response = doGet(SPACETI_DEVICES_URL, JsonNode.class);
+    private Pair<JsonNode, String> retrieveSpacetiDevices(String nextPageURL) throws Exception {
+        JsonNode response = doGet(nextPageURL, JsonNode.class);
+        
         if (response == null) {
             return Pair.of(null, null);
         }
-        //return Pair.of(response, response.at("/next_page_token").asText());
+
+        if (!response.at("/next").isNull()) {
+            String[] nextUrlSplit = response.at("/next").asText().split("/");
+            String nextUrl = String.join("/", Arrays.copyOfRange(nextUrlSplit, 3, nextUrlSplit.length));
+            return Pair.of(response, nextUrl);
+        }
+        
         return Pair.of(response, null);
     }
      
