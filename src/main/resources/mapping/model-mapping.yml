@@ -3,13 +3,112 @@ models:
       name: Generic
       vendor: Spaceti
       node: records
-      filter: get("sn") != null # filter is necessary to get records back
+      filter: get("device_type")?.asText().equals("1") == false && get("device_type")?.asText().equals("2") == false && get("device_type")?.asText().equals("4") == false && get("device_type")?.asText().equals("5") == false && get("device_type")?.asText().equals("6") == false && get("device_type")?.asText().equals("8") == false
       mapping:
-        type: Computer
-        category: Spaceti
+        type: AV Devices
+        category: Sensor
         serialNumber: get("sn")
         deviceId: get("mac")
-        deviceName: at("/location/device_name")
-        deviceMake: "Other"
-        deviceModel: "Unknown"
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "Other"
         deviceOnline: "Unknown"
+  - model:
+      name: StandardSensor
+      vendor: Spaceti
+      node: records
+      filter: get("device_type")?.asText().equals("1") == true
+      mapping:
+        type: AV Devices
+        category: Sensor
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "Environmental Sensor"
+        deviceOnline: "Unknown"
+      properties:
+        temperature: at("/temperature/measurement/value")?.asDouble()
+        humidity: at("/humidity/measurement/value")?.asDouble()
+  - model:
+      name: WorkplaceOccupancySensor
+      vendor: Spaceti
+      node: records
+      filter: get("device_type")?.asText().equals("2") == true
+      mapping:
+        type: AV Devices
+        category: Sensor
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "Workplace Occupancy Sensor"
+        deviceOnline: "Unknown"
+      properties:
+        occupancy: at("/occupancy/measurement/value")?.asBoolean()
+  - model:
+      name: EnvironmentalSensor
+      vendor: Spaceti
+      node: records
+      filter: get("device_type")?.asText().equals("4") == true
+      mapping:
+        type: AV Devices
+        category: Sensor
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "Environmental Sensor"
+        deviceOnline: "Unknown"
+      properties:
+        temperature: at("/temperature/measurement/value")?.asDouble()
+        humidity: at("/humidity/measurement/value")?.asDouble()
+        co2: at("/co2/measurement/value")?.asDouble()
+  - model:
+      name: ParkingSensor
+      vendor: Spaceti
+      node: records
+      filter: get("device_type")?.asText().equals("5") == true
+      mapping:
+        type: AV Devices
+        category: Sensor
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "Parking Sensor"
+        deviceOnline: "Unknown"
+      properties:
+        occupancy: at("/occupancy/measurement/value")?.asBoolean()
+  - model:
+      name: RoomOccupancySensor
+      vendor: Spaceti
+      node: records
+      filter: get("device_type")?.asText().equals("6") == true
+      mapping:
+        type: AV Devices
+        category: Sensor
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "Room Occupancy Sensor"
+        deviceOnline: "Unknown"
+      properties:
+        occupancy: at("/occupancy/measurement/value")?.asBoolean()
+  - model:
+      name: PeopleCounterSensor
+      vendor: Spaceti
+      node: records
+      filter: get("device_type")?.asText().equals("8") == true
+      mapping:
+        type: AV Devices
+        category: Sensor
+        serialNumber: get("sn")
+        deviceId: get("mac")
+        deviceName: get("sn")
+        deviceMake: "Spaceti"
+        deviceModel: "People Counter Sensor"
+        deviceOnline: "Unknown"
+      properties:
+        people_count: at("/people_count/measurement/value")?.asInt()
