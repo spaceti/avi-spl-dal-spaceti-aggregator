@@ -16,9 +16,9 @@ import com.avispl.symphony.dal.util.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import java.util.stream.Collectors;
 
-import javax.security.auth.login.FailedLoginException;
-
 import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.concurrent.*;
 import org.springframework.http.HttpHeaders;
@@ -73,12 +73,10 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
                         logger.debug("Fetching devices list");
                     }
                     fetchDevicesList();
-                    //knownErrors.remove(ROOMS_LIST_RETRIEVAL_ERROR_KEY);
                     if (logger.isDebugEnabled()) {
                         logger.debug("Fetched devices list: " + aggregatedDevices);
                     }
                 } catch (Exception e) {
-                    //knownErrors.put(ROOMS_LIST_RETRIEVAL_ERROR_KEY, limitErrorMessageByLength(e.getMessage(), maxErrorLength));
                     logger.error("Error occurred during device list retrieval: " + e.getMessage() + " with cause: " + e.getCause().getMessage(), e);
                 }
 
@@ -165,7 +163,7 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
     /**
      * Indicates whether a device is considered as paused.
      * True by default so if the system is rebooted and the actual value is lost -> the device won't start stats
-     * collection unless the {@link ZoomRoomsAggregatorCommunicator#retrieveMultipleStatistics()} method is called which will change it
+     * collection unless the {@link SpacetiAggregatorCommunicator#retrieveMultipleStatistics()} method is called which will change it
      * to a correct value
      */
     private volatile boolean devicePaused = true;
@@ -175,7 +173,7 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
      */
     private volatile long validRetrieveStatisticsTimestamp;
     /**
-     * Aggregator inactivity timeout. If the {@link ZoomRoomsAggregatorCommunicator#retrieveMultipleStatistics()}  method is not
+     * Aggregator inactivity timeout. If the {@link SpacetiAggregatorCommunicator#retrieveMultipleStatistics()}  method is not
      * called during this period of time - device is considered to be paused, thus the Cloud API
      * is not supposed to be called
      */
@@ -234,6 +232,48 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
 
         extendedStatistics.setStatistics(statistics);
         return Collections.singletonList(extendedStatistics);
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Spaceti API endpoint does not have ICMP available, so this workaround is needed to provide
+     * ping latency information to Symphony
+     */
+    @Override
+    public int ping() throws Exception {
+        if (isInitialized()) {
+            long pingResultTotal = 0L;
+
+            for (int i = 0; i < this.getPingAttempts(); i++) {
+                long startTime = System.currentTimeMillis();
+
+                try (Socket puSocketConnection = new Socket(this.getHost(), this.getPort())) {
+                    puSocketConnection.setSoTimeout(this.getPingTimeout());
+
+                    if (puSocketConnection.isConnected()) {
+                        long pingResult = System.currentTimeMillis() - startTime;
+                        pingResultTotal += pingResult;
+                        if (logger.isDebugEnabled()) {
+                            logger.debug(String.format("PING OK: Attempt #%s to connect to %s on port %s succeeded in %s ms", i + 1, this.getHost(), this.getPort(), pingResult));
+                        }
+                    } else {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug(String.format("PING DISCONNECTED: Connection to %s did not succeed within the timeout period of %sms", this.getHost(), this.getPingTimeout()));
+                        }
+                        return this.getPingTimeout();
+                    }
+                } catch (SocketTimeoutException tex) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(String.format("PING TIMEOUT: Connection to %s did not succeed within the timeout period of %sms", this.getHost(), this.getPingTimeout()));
+                    }
+                    return this.getPingTimeout();
+                }
+            }
+            return Math.max(1, Math.toIntExact(pingResultTotal / this.getPingAttempts()));
+        } else {
+            throw new IllegalStateException("Cannot use device class without calling init() first");
+        }
     }
 
 
@@ -390,7 +430,7 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
     /**
      * Update the status of the device.
      * The device is considered as paused if did not receive any retrieveMultipleStatistics()
-     * calls during {@link ZoomRoomsAggregatorCommunicator#validRetrieveStatisticsTimestamp}
+     * calls during {@link SpacetiAggregatorCommunicator#validRetrieveStatisticsTimestamp}
      */
     private synchronized void updateAggregatorStatus() {
         devicePaused = validRetrieveStatisticsTimestamp < System.currentTimeMillis();
@@ -402,12 +442,12 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
 
     /**
      * Uptime is received in seconds, need to normalize it and make it human readable, like
-     * 1 day(s) 5 hour(s) 12 minute(s) 55 minute(s)
+     * 1 day(s) 5 hour(s) 12 minute(s) 55 second(s)
      * Incoming parameter is may have a decimal point, so in order to safely process this - it's rounded first.
      * We don't need to add a segment of time if it's 0.
      *
      * @param uptimeSeconds value in seconds
-     * @return string value of format 'x day(s) x hour(s) x minute(s) x minute(s)'
+     * @return string value of format 'x day(s) x hour(s) x minute(s) x second(s)'
      */
     private String normalizeUptime(long uptimeSeconds) {
         StringBuilder normalizedUptime = new StringBuilder();
