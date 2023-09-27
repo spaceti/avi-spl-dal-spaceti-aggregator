@@ -40,6 +40,13 @@ public class SpacetiAggregatorCommunicatorTest
         Assert.assertFalse(devices.isEmpty());
         Assert.assertEquals(50, devices.size());
         Assert.assertNotNull(devices.get(0).getSerialNumber());
+    }
 
+    @Test
+    public void pingTest() throws Exception {
+        mockAggregatorCommunicator.init();
+        int pingLatency = mockAggregatorCommunicator.ping();
+        Assert.assertNotEquals(0, pingLatency);
+        System.out.println("Ping latency calculated: " + pingLatency);
     }
 }
