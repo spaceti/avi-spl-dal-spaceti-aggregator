@@ -49,4 +49,12 @@ public class SpacetiAggregatorCommunicatorTest
         Assert.assertNotEquals(0, pingLatency);
         System.out.println("Ping latency calculated: " + pingLatency);
     }
+
+    @Test
+    public void getAggregatorDataTest() throws Exception {
+        mockAggregatorCommunicator.init();
+        List<Statistics> statistics = mockAggregatorCommunicator.getMultipleStatistics();
+        Assert.assertEquals(1, statistics.size());
+        Assert.assertNotNull(statistics.get(0));
+    }
 }
