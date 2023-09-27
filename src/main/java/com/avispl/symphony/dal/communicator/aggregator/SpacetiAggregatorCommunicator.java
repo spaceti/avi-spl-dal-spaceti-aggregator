@@ -1,6 +1,10 @@
 package com.avispl.symphony.dal.communicator.aggregator;
 
+import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
+import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
+import com.avispl.symphony.api.dal.dto.monitor.Statistics;
 import com.avispl.symphony.api.dal.dto.monitor.aggregator.AggregatedDevice;
+import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.api.dal.monitor.aggregator.Aggregator;
 import com.avispl.symphony.dal.communicator.RestCommunicator;
 import com.avispl.symphony.dal.aggregator.parser.AggregatedDeviceProcessor;
@@ -11,6 +15,9 @@ import com.avispl.symphony.dal.util.StringUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 import java.util.stream.Collectors;
+
+import javax.security.auth.login.FailedLoginException;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
@@ -18,7 +25,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 
 
-public class SpacetiAggregatorCommunicator extends RestCommunicator implements Aggregator
+public class SpacetiAggregatorCommunicator extends RestCommunicator implements Aggregator, Monitorable
 {
     /**
      * Build an instance of SpacetiAggregatorCommunicator
@@ -29,8 +36,8 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
     public SpacetiAggregatorCommunicator() throws IOException {
         Map<String, PropertiesMapping> mapping = new PropertiesMappingParser().loadYML("mapping/model-mapping.yml", getClass());
         aggregatedDeviceProcessor = new AggregatedDeviceProcessor(mapping);
-        // adapterProperties = new Properties();
-        // adapterProperties.load(getClass().getResourceAsStream("/version.properties"));
+        adapterProperties = new Properties();
+        adapterProperties.load(getClass().getResourceAsStream("/version.properties"));
     }
 
     class SpacetiDeviceDataLoader implements Runnable {
@@ -53,6 +60,12 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
 
                 if (!inProgress) {
                     break mainloop;
+                }
+
+                // next line will determine whether Spaceti monitoring was paused
+                updateAggregatorStatus();
+                if (devicePaused) {
+                    continue mainloop;
                 }
 
                 try {
@@ -85,43 +98,6 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
                         //
                     }
                 }
-
-                // try {
-                //     // The following request collect all the information, so in order to save number of requests, which is
-                //     // daily limited for certain APIs, we need to request them once per monitoring cycle.
-                //     retrieveZoomRoomMetrics();
-                //     knownErrors.remove(ROOMS_METRICS_RETRIEVAL_ERROR_KEY);
-                // } catch (Exception e) {
-                //     knownErrors.put(ROOMS_METRICS_RETRIEVAL_ERROR_KEY, limitErrorMessageByLength(e.getMessage(), maxErrorLength));
-                //     logger.error("Error occurred during ZoomRooms metrics retrieval: " + e.getMessage() + " with cause: " + e.getCause().getMessage());
-                // }
-
-                // for (AggregatedDevice aggregatedDevice : aggregatedDevices.values()) {
-                //     if (!inProgress) {
-                //         break;
-                //     }
-                //     devicesExecutionPool.add(executorService.submit(() -> {
-                //         String deviceId = aggregatedDevice.getDeviceId();
-                //         try {
-                //             populateDeviceDetails(deviceId);
-                //             knownErrors.remove(deviceId);
-                //         } catch (Exception e) {
-                //             knownErrors.put(deviceId, limitErrorMessageByLength(e.getMessage(), maxErrorLength));
-                //             logger.error(String.format("Exception during Zoom Room '%s' data processing.", aggregatedDevice.getDeviceName()), e);
-                //         }
-                //     }));
-                // }
-
-                // do {
-                //     try {
-                //         TimeUnit.MILLISECONDS.sleep(500);
-                //     } catch (InterruptedException e) {
-                //         if (!inProgress) {
-                //             break;
-                //         }
-                //     }
-                //     devicesExecutionPool.removeIf(Future::isDone);
-                // } while (!devicesExecutionPool.isEmpty());
 
                 // We don't want to fetch devices statuses too often, so by default it's currentTime + 30s
                 // otherwise - the variable is reset by the retrieveMultipleStatistics() call, which
@@ -186,17 +162,34 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
      * {@link #aggregatedDevices} resets it to the currentTime timestamp, which will re-activate data collection.
      */
     private static long nextDevicesCollectionIterationTimestamp;
-
+    /**
+     * Indicates whether a device is considered as paused.
+     * True by default so if the system is rebooted and the actual value is lost -> the device won't start stats
+     * collection unless the {@link ZoomRoomsAggregatorCommunicator#retrieveMultipleStatistics()} method is called which will change it
+     * to a correct value
+     */
+    private volatile boolean devicePaused = true;
+    /**
+     * This parameter holds timestamp of when we need to stop performing API calls
+     * It used when device stop retrieving statistic. Updated each time of called #retrieveMultipleStatistics
+     */
+    private volatile long validRetrieveStatisticsTimestamp;
+    /**
+     * Aggregator inactivity timeout. If the {@link ZoomRoomsAggregatorCommunicator#retrieveMultipleStatistics()}  method is not
+     * called during this period of time - device is considered to be paused, thus the Cloud API
+     * is not supposed to be called
+     */
+    private static final long retrieveStatisticsTimeOut = 3 * 60 * 1000;
+    /**
+     * Adapter metadata, collected from the version.properties
+     */
+    private Properties adapterProperties;
 
 
     @Override
     public List<AggregatedDevice> retrieveMultipleStatistics() throws Exception {
-
         // Device aggregator has to return statistics for all devices it aggregates
         // see javadoc for com.avispl.symphony.api.dal.dto.monitor.aggregator.AggregatedDevice for all that needs to be returned
-        // Code in this sample constructs dummy instances of AggregatedDevice with fake data
-        // In real adapter following information needs to be retrieved from the target device and mapped to AggregatedDevice instance
-        // using remote network calls
         if (logger.isDebugEnabled()) {
             logger.debug(String.format("Adapter initialized: %s, executorService exists: %s, serviceRunning: %s", isInitialized(), executorService != null, serviceRunning));
         }
@@ -212,7 +205,8 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
         }
         long currentTimestamp = System.currentTimeMillis();
         nextDevicesCollectionIterationTimestamp = currentTimestamp;
-        
+        updateValidRetrieveStatisticsTimestamp();
+
         aggregatedDevices.values().forEach(aggregatedDevice -> aggregatedDevice.setTimestamp(currentTimestamp));
         return new ArrayList<>(aggregatedDevices.values());
     }
@@ -224,6 +218,24 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
                 .filter(aggregatedDevice -> list.contains(aggregatedDevice.getDeviceId()))
                 .collect(Collectors.toList());
     }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<Statistics> getMultipleStatistics() throws Exception {
+        Map<String, String> statistics = new HashMap<>();
+        ExtendedStatistics extendedStatistics = new ExtendedStatistics();
+
+        statistics.put("AdapterVersion", adapterProperties.getProperty("mock.aggregator.version"));
+        statistics.put("AdapterBuildDate", adapterProperties.getProperty("mock.aggregator.build.date"));
+        statistics.put("AdapterUptime", normalizeUptime((System.currentTimeMillis() - adapterInitializationTimestamp) / 1000));
+
+        extendedStatistics.setStatistics(statistics);
+        return Collections.singletonList(extendedStatistics);
+    }
+
 
     /**
      * {@inheritDoc}
@@ -249,22 +261,32 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
             throw new RuntimeException("Error occurred during devices list retrieval: " + e.getMessage() + " with cause: " + e.getCause().getMessage(), e);
         }
 
+        List<String> retrievedDeviceIds = new ArrayList<>();
         spacetiDevices.forEach(aggregatedDevice -> {
             String deviceId = aggregatedDevice.getDeviceId();
+            retrievedDeviceIds.add(deviceId);
             if (aggregatedDevices.containsKey(deviceId)) {
-                //ToDo: update with new data
-                //aggregatedDevices.get(deviceId).setDeviceOnline(aggregatedDevice.getDeviceOnline());
+                aggregatedDevices.get(deviceId).setDeviceOnline(aggregatedDevice.getDeviceOnline());
+                aggregatedDevices.get(deviceId).setProperties(aggregatedDevice.getProperties());
             } else {
                 aggregatedDevices.put(deviceId, aggregatedDevice);
             }
         });
-        // ToDo: remove devices that were not populated by the API
+        // Remove devices that were not populated by the API
+        aggregatedDevices.keySet().removeIf(existingDevice -> !retrievedDeviceIds.contains(existingDevice));
+
+        if (spacetiDevices.isEmpty()) {
+            // If all the devices were not populated for any specific reason (no devices available, filtering, etc)
+            aggregatedDevices.clear();
+        }
+
+        nextDevicesCollectionIterationTimestamp = System.currentTimeMillis();
     }
 
     /**
      * Retrieve Spaceti devices with support of the Spaceti API pagination (next page token)
      *
-     * @param spacetiDevices to save all retrieved rooms to
+     * @param spacetiDevices to save all retrieved devices to
      * @throws Exception if any communication error occurs
      * */
     private void processPaginatedSpacetiRetrieval(List<AggregatedDevice> spacetiDevices) throws Exception {
@@ -364,4 +386,49 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
         aggregatedDevices.clear();
         super.internalDestroy();
     }  
+
+    /**
+     * Update the status of the device.
+     * The device is considered as paused if did not receive any retrieveMultipleStatistics()
+     * calls during {@link ZoomRoomsAggregatorCommunicator#validRetrieveStatisticsTimestamp}
+     */
+    private synchronized void updateAggregatorStatus() {
+        devicePaused = validRetrieveStatisticsTimestamp < System.currentTimeMillis();
+    }
+    private synchronized void updateValidRetrieveStatisticsTimestamp() {
+        validRetrieveStatisticsTimestamp = System.currentTimeMillis() + retrieveStatisticsTimeOut;
+        updateAggregatorStatus();
+    }
+
+    /**
+     * Uptime is received in seconds, need to normalize it and make it human readable, like
+     * 1 day(s) 5 hour(s) 12 minute(s) 55 minute(s)
+     * Incoming parameter is may have a decimal point, so in order to safely process this - it's rounded first.
+     * We don't need to add a segment of time if it's 0.
+     *
+     * @param uptimeSeconds value in seconds
+     * @return string value of format 'x day(s) x hour(s) x minute(s) x minute(s)'
+     */
+    private String normalizeUptime(long uptimeSeconds) {
+        StringBuilder normalizedUptime = new StringBuilder();
+
+        long seconds = uptimeSeconds % 60;
+        long minutes = uptimeSeconds % 3600 / 60;
+        long hours = uptimeSeconds % 86400 / 3600;
+        long days = uptimeSeconds / 86400;
+
+        if (days > 0) {
+            normalizedUptime.append(days).append(" day(s) ");
+        }
+        if (hours > 0) {
+            normalizedUptime.append(hours).append(" hour(s) ");
+        }
+        if (minutes > 0) {
+            normalizedUptime.append(minutes).append(" minute(s) ");
+        }
+        if (seconds > 0) {
+            normalizedUptime.append(seconds).append(" second(s)");
+        }
+        return normalizedUptime.toString().trim();
+    }
 }
