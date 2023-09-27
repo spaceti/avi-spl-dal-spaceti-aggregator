@@ -12,7 +12,7 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "Other"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
   - model:
       name: StandardSensor
       vendor: Spaceti
@@ -26,7 +26,7 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "Environmental Sensor"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
       properties:
         temperature: at("/temperature/measurement/value")?.asDouble()
         humidity: at("/humidity/measurement/value")?.asDouble()
@@ -43,7 +43,7 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "Workplace Occupancy Sensor"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
       properties:
         occupancy: at("/occupancy/measurement/value")?.asBoolean()
   - model:
@@ -59,7 +59,7 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "Environmental Sensor"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
       properties:
         temperature: at("/temperature/measurement/value")?.asDouble()
         humidity: at("/humidity/measurement/value")?.asDouble()
@@ -77,7 +77,7 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "Parking Sensor"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
       properties:
         occupancy: at("/occupancy/measurement/value")?.asBoolean()
   - model:
@@ -93,7 +93,7 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "Room Occupancy Sensor"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
       properties:
         occupancy: at("/occupancy/measurement/value")?.asBoolean()
   - model:
@@ -109,6 +109,6 @@ models:
         deviceName: get("sn")
         deviceMake: "Spaceti"
         deviceModel: "People Counter Sensor"
-        deviceOnline: "Unknown"
+        deviceOnline: get("is_online")?.asBoolean()
       properties:
         people_count: at("/people_count/measurement/value")?.asInt()
