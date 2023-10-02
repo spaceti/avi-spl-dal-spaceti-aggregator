@@ -6,7 +6,7 @@
 
   <groupId>com.avispl.symphony.dal.communicator.aggregator</groupId>
   <artifactId>avi-spl-dal-spaceti-aggregator</artifactId>
-  <version>1.1</version>
+  <version>1.2</version>
 
   <name>avi-spl-dal-spaceti-aggregator</name>
   <url>https://www.spaceti.com</url>
@@ -227,5 +227,11 @@
         </plugin>
       </plugins>
     </pluginManagement>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
   </build>
 </project>
