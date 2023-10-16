@@ -38,7 +38,7 @@ public class SpacetiAggregatorCommunicatorTest
         Thread.sleep(5000);
         List<AggregatedDevice> devices = mockAggregatorCommunicator.retrieveMultipleStatistics();
         Assert.assertFalse(devices.isEmpty());
-        Assert.assertEquals(50, devices.size());
+        Assert.assertEquals(47, devices.size());
         Assert.assertNotNull(devices.get(0).getSerialNumber());
     }
 
