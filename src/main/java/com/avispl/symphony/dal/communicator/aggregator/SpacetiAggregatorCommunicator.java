@@ -319,8 +319,6 @@ public class SpacetiAggregatorCommunicator extends RestCommunicator implements A
             // If all the devices were not populated for any specific reason (no devices available, filtering, etc)
             aggregatedDevices.clear();
         }
-
-        nextDevicesCollectionIterationTimestamp = System.currentTimeMillis();
     }
 
     /**
